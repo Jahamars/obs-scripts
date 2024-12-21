@@ -1,23 +1,45 @@
 #!/bin/bash
 
-# Function to prompt for input
+LSF="./last_connection.txt"
+
 prompt() {
-    read -p "$1: " input
-    echo "$input"
+    local label=$1
+    local default_value=$2
+    if [ -n "$default_value" ]; then
+        read -p "$label [$default_value]: " input
+        echo "${input:-$default_value}"
+    else
+        read -p "$label: " input
+        echo "$input"
+    fi
 }
 
-# Get user inputs
-MODE=$(prompt "Choose mode (1: Send, 2: Receive)")
-LOCAL_PATH=$(prompt "Enter the local directory path")
-REMOTE_PATH=$(prompt "Enter the remote directory path")
-REMOTE_USER=$(prompt "Enter remote username")
-REMOTE_HOST=$(prompt "Enter remote host (IP or hostname)")
+# Проверяем, существует ли файл с последним подключением
+if [ -f "$LSF" ]; then
+    # Считываем данные из файла
+    IFS=',' read -r LAST_MODE LAST_LOCAL_PATH LAST_REMOTE_PATH LAST_REMOTE_USER LAST_REMOTE_HOST < "$LSF"
+else
+    # Если файл отсутствует, задаем пустые значения
+    LAST_MODE="" LAST_LOCAL_PATH="" LAST_REMOTE_PATH="" LAST_REMOTE_USER="" LAST_REMOTE_HOST=""
+fi
 
-# Remove trailing slashes
+# Запрашиваем режим
+MODE=$(prompt "Choose mode (1: Send, 2: Receive)" "$LAST_MODE")
+
+# Запрашиваем пути и данные с возможностью использовать последние значения
+LOCAL_PATH=$(prompt "Enter the local directory path" "$LAST_LOCAL_PATH")
+REMOTE_PATH=$(prompt "Enter the remote directory path" "$LAST_REMOTE_PATH")
+REMOTE_USER=$(prompt "Enter remote username" "$LAST_REMOTE_USER")
+REMOTE_HOST=$(prompt "Enter remote host (IP or hostname)" "$LAST_REMOTE_HOST")
+
+# Удаляем завершающие слеши
 LOCAL_PATH=${LOCAL_PATH%/}
 REMOTE_PATH=${REMOTE_PATH%/}
 
-# Execute rsync based on the mode
+# Сохраняем данные в файл
+echo "$MODE,$LOCAL_PATH,$REMOTE_PATH,$REMOTE_USER,$REMOTE_HOST" > "$LSF"
+
+# Выполняем rsync в зависимости от режима
 if [ "$MODE" -eq 1 ]; then
     echo "Sending files to remote host..."
     rsync -avz --progress "$LOCAL_PATH/" "$REMOTE_USER@$REMOTE_HOST:$REMOTE_PATH/"
